@@ -1,0 +1,139 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Xml;
+using System.Data.SqlClient;
+using System.Xml.Linq;
+using System.Diagnostics;
+
+
+namespace ConsoleApp1
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            //считывание xml-файла
+            Console.WriteLine("Считывание xml-файла settings.xml");
+            XmlDocument xDoc = new XmlDocument();
+                //Путь к xml-файлу Settings
+                xDoc.Load("C:/Users/Nickvaler/Desktop/settings.xml");
+            
+            //считывание строки подключения
+            string s1 = (xDoc.SelectSingleNode("dbConfiguration/connectionString").InnerText);
+
+            //Подключение к БД 
+            SqlConnection sqlCon = new SqlConnection(s1);
+            //Проверка подключения к БД
+            try
+            {
+                sqlCon.Open();
+                Console.WriteLine("Подключено к базе данных");
+                Console.WriteLine("Свойства подключения:");
+                Console.WriteLine("\tСтрока подключения: {0}", sqlCon.ConnectionString);
+                Console.WriteLine("\tБаза данных: {0}", sqlCon.Database);
+                Console.WriteLine("\tСервер: {0}", sqlCon.DataSource);
+                Console.WriteLine("\tВерсия сервера: {0}", sqlCon.ServerVersion);
+                Console.WriteLine("\tСостояние: {0}", sqlCon.State);
+                Console.WriteLine("\tWorkstationld: {0}", sqlCon.WorkstationId+"\n");
+            }
+            catch (SqlException ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            finally
+            {
+                sqlCon.Close();                
+            }
+            //считывание остальных строк из xml
+            //Считывание папки для сохранения конечного XML файла
+                string s2 = (xDoc.SelectSingleNode("dbConfiguration/targetFolder").InnerText);
+            //Считывание названия таблицы
+                string s3 = (xDoc.SelectSingleNode("dbConfiguration/tableSettings/tableName").InnerText);
+            //Считывание названия столбцов 
+
+                //XmlElement xRoot = xDoc.DocumentElement;
+                //XmlNodeList childnodes = xRoot.SelectNodes("//columns/column");
+                //foreach (XmlNode n in childnodes)
+                //Console.WriteLine(n.InnerText);
+
+                string s4 = (xDoc.SelectSingleNode("dbConfiguration/tableSettings/columns/column1").InnerText);
+                string s5 = (xDoc.SelectSingleNode("dbConfiguration/tableSettings/columns/column2").InnerText);
+                string s6 = (xDoc.SelectSingleNode("dbConfiguration/tableSettings/columns/column3").InnerText);
+                string s7 = (xDoc.SelectSingleNode("dbConfiguration/tableSettings/columns/column4").InnerText);
+
+            //Запрос в БД на выборку первых 10 строк 
+                string sqlExpression = $"SELECT {s4},{s5},{s6} FROM {s3}";
+                using (SqlConnection connection = new SqlConnection(s1))
+            
+                {
+                connection.Open();
+                SqlCommand command = new SqlCommand(sqlExpression, connection);
+                SqlDataReader reader = command.ExecuteReader();
+                if (reader.HasRows)
+                {
+                    Console.WriteLine("{0} \t{1} \t{2}", reader.GetName(0), reader.GetName(1), reader.GetName(2));
+                    // " \t{3} \t{4} \t{5} \t{6} \t{7}", reader.GetName(0), reader.GetName(1), reader.GetName(2), reader.GetName(3), reader.GetName(4), reader.GetName(5), reader.GetName(6), reader.GetName(7));
+                    //Счетчик для каждых 10 строк
+                    int sum = 0;
+
+                    //Переменная для соединения информации со столбцов в одну строку
+                    string inputString = "";
+
+                    while (reader.Read())
+                    {
+                        object id = reader.GetValue(0);
+                        object Login = reader.GetValue(1);
+                        object Password = reader.GetValue(2);
+                        //object Name = reader.GetValue(3);
+                        //object Surname = reader.GetValue(4);
+                        //object Patronymic = reader.GetValue(5);
+                        //object Date = reader.GetValue(6);
+                        //object Email = reader.GetValue(7);
+
+                        //Создание xml файла с результатами выборки
+                        XDocument xdoc = new XDocument();
+                        //Корневой элемент
+                        XElement columns = new XElement("columns");
+                        //Вторичные элементы
+                        XElement column = new XElement("column", reader.GetName(0) + "\t" + reader.GetName(1) + "\t" + reader.GetName(2));
+                        
+                        //Console.WriteLine("{0} \t{1} \t\t{2}", id, Login, Password);
+                        //// " \t\t{3} \t{4} \t{5} \t{6} \t{7}", id, Login, Password, Name, Surname, Patronymic, Date, Email);
+                        
+                        sum++;
+                        inputString = Convert.ToString(id)+ "  " + Convert.ToString(Login)+"  "+Convert.ToString(Password);
+                        Console.WriteLine(inputString);
+                        
+                        for (int i = 1; i <= 10; i++)
+                        {
+                            XElement column1 = new XElement($"column{sum}", inputString);
+                            columns.Add(column1);
+                        }
+                        
+                        xdoc.Add(columns);
+
+                        //Сохраняет каждые 10 строк в xml файл с названием конечного id 
+                        if (sum%10==0)
+                        {
+                            //Сохраняет xml-файл по расположению TargetFolder
+                            xdoc.Save($"{s2}{id}.xml");
+                            //Открывает xml-файл по расположению TargetFolder
+                            //Process.Start($"{s2}{id}.xml");
+                        }
+                    }
+                    //XmlTextWriter xW = new XmlTextWriter($"s2", Encoding.UTF8);
+                    //xW.Formatting = Formatting.Indented;
+                    //xW.WriteStartElement("Columns");
+                    //xW.WriteStartElement("Column");
+                    //xW.WriteString(s2);
+                    //xW.WriteEndElement();
+                    //xW.WriteEndElement();
+                    //xW.Close();
+                }
+            }
+        }
+    }
+}
